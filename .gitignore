@@ -1,0 +1,8 @@
+# Local, machine-specific config — generated from config_default.yaml on first run.
+# Never commit this; config_default.yaml is the committed source of truth.
+config.yaml
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/

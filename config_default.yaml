@@ -1,0 +1,32 @@
+# config_default.yaml — canonical defaults (committed to the repo).
+#
+# This file is the single source of truth for WHICH keys exist and their
+# fallback values. Do NOT put secrets or machine-specific values here.
+#
+# On first run, the loaders copy this file to config.yaml (which is
+# gitignored). Edit config.yaml for local overrides — anything you leave
+# out there falls back to the value here.
+
+app:
+  name: my-app
+  log_level: info
+  workers: 4
+
+paths:
+  data_dir: ./data
+  cache_dir: ${paths.data_dir}/cache    # ${nested.key} cross-reference (bash resolves natively)
+
+database:
+  host: localhost
+  port: 5432
+  password: ${env:DB_PASSWORD:-changeme} # ${env:VAR:-default} pulls from the environment
+
+features:
+  - search
+  - export
+
+multiline_literal: |
+  This is line one.
+  This is line two.
+  This is line three.
+  # This is line four, which is part of the literal block.
