@@ -55,6 +55,67 @@ check "db.password uses env when set" "s3cret" "$(config get database.password)"
 unset DB_PASSWORD
 config destroy
 
+echo "Test 4: __REQUIRED__ placeholder triggers early exit"
+REQ_TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" "$REQ_TMP"' EXIT
+cat > "$REQ_TMP/config_default.yaml" <<'EOF'
+venv_path: __REQUIRED__
+aws:
+  s3_bucket: "my-bucket"
+  region: __REQUIRED__
+features:
+  - alpha
+  - __REQUIRED__
+EOF
+
+# 4a: nothing filled in — load fails and names every pending field.
+cat > "$REQ_TMP/config.yaml" <<'EOF'
+aws:
+  s3_bucket: "my-bucket"
+EOF
+config_load "$REQ_TMP" 2>/dev/null
+check "load fails while placeholders remain" "1" "$?"
+check "config torn down after failure" "no" \
+    "$(declare -F config >/dev/null 2>&1 && echo yes || echo no)"
+
+CONFIG_SKIP_REQUIRED_CHECK=1 config_load "$REQ_TMP" 2>/dev/null
+check "skip flag loads anyway" "0" "$?"
+check "required lists all pending fields" "aws.region
+features
+venv_path" "$(config required)"
+config destroy
+
+# 4b: user tier fills them in — placeholders in the defaults are overridden.
+cat > "$REQ_TMP/config.yaml" <<'EOF'
+venv_path: /opt/venvs/app
+aws:
+  s3_bucket: "my-bucket"
+  region: us-east-1
+features:
+  - alpha
+  - beta
+EOF
+config_load "$REQ_TMP" 2>/dev/null
+check "load succeeds once filled in" "0" "$?"
+check "no pending fields" "" "$(config required)"
+check "underscore key still resolves" "my-bucket" "$(config get aws.s3_bucket)"
+config destroy
+
+# 4c: a placeholder written into the user tier is caught too.
+cat > "$REQ_TMP/config.yaml" <<'EOF'
+venv_path: __REQUIRED__
+aws:
+  s3_bucket: "my-bucket"
+  region: us-east-1
+features:
+  - alpha
+EOF
+config_load "$REQ_TMP" 2>/dev/null
+check "user-tier placeholder fails load" "1" "$?"
+CONFIG_SKIP_REQUIRED_CHECK=1 config_load "$REQ_TMP" 2>/dev/null
+check "user-tier placeholder listed" "venv_path" "$(config required)"
+config destroy
+
 echo
 echo "Passed: $PASS  Failed: $FAIL"
 [[ "$FAIL" -eq 0 ]]
